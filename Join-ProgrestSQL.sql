@@ -1,0 +1,768 @@
+--- CHAPTER 1 - Introduction to joins
+
+--- INNER JOIN
+
+SELECT * 
+FROM cities;
+
+SELECT * 
+FROM cities
+INNER JOIN countries
+ON cities.country_code = countries.code;
+
+SELECT cities.name AS city, countries.name AS country, region
+-- field  that appears in many tables->identify which table alias I refer to with .
+FROM cities 
+INNER JOIN countries 
+ON cities.country_code = countries.code;
+
+--- INNER JOIN (2)
+-------get data from countries n conomies tables 
+-->to examine the inflation rate for 2010 and 2015.
+
+/* Analysis: Join table: countries (c) and table: economies (e) ON...
+
+from this join: SELECT...c.code (country_code),
+                         c. name,
+                         e.year,
+                         e.inflation_rate
+*/
+
+SELECT c.code AS country_code, c.name, e.year, e.inflation_rate
+FROM countries AS c
+    INNER JOIN economies AS e
+    ON c.code = e.code;
+
+
+SELECT c.code, c.name, c.region, p.year, p.fertility_rate
+INNER JOIN populations AS p
+ON c.code = p.country_code
+
+---------------------------------
+/*Syntax:
+SELECT *
+FROM left_table
+  INNER JOIN right_table
+    ON left_table.id = right_table.id
+  INNER JOIN another_table
+    ON left_table.id = another_table.id;
+*/
+
+-- 
+--Show:  for each country, you want to get the country name, its region, the fertility rate, unemployment rate
+-- for both 2010 and 2015.
+SELECT 
+    c.code, 
+    c.name, 
+    c.region, 
+    p.fertility_rate, 
+    e.year, ##year appears in populations & economies,-> e.year instead of p.year
+    e.unemployment_rate
+FROM countries AS c
+INNER JOIN populations AS p
+    ON c.code = p.country_code
+INNER JOIN economies AS e
+    ON c.code = e.code
+    AND p.year = e.year;
+
+--- Inner join with using
+
+SELECT c.name AS country,
+        c.continent, 
+        l.name AS language,
+        l.official #whether or not the language is official.
+FROM countries AS c
+INNER JOIN languages AS l
+USING (code);
+
+--- Self-join
+--#calculate the percentage increase in population 
+--from 2010 to 2015 for each country code! (step)
+
+--STEP 1: 
+SELECT p1.country_code, 
+       p1.size AS size2010,
+       p2.size AS size2015
+FROM populations AS p1
+INNER JOIN populations AS p2
+ON  p1.country_code = p2.country_code
+AND p1.year = p2.year - 5; #to omit 3 unecessary entries per country_code
+
+--Last step:
+SELECT p1.country_code, 
+       p1.size AS size2010,
+       p2.size AS size2015,
+       ((p2.size - p1.size) / p1.size * 100.0) AS growth_perc
+FROM populations AS p1
+INNER JOIN populations AS p2
+ON  p1.country_code = p2.country_code
+AND p1.year = p2.year - 5; #to omit 3 unecessary entries per country_code
+
+--- Case when and then
+-- Define a goruping field, Use these syntax:
+--#CASE WHEN...THEN
+ --#    WHEN...THEN
+ --#    ELSE....END
+ --#    AS
+
+---Require: Grouping area into 3 groups: > 2000000, 2000000- 350000m >350000
+
+--- Analysis: Put this grouping into SELECT
+---> Select: get code, name, continent,region,surface_area that satisfied conditions in CASE WHEN THEN
+---> aliasing result of grouping( use CASE WHEN THEN): geosize_group
+SELECT name, continent, code, surface_area,
+    
+    CASE WHEN surface_area > 2000000 THEN 'large'
+        WHEN surface_area > 350000  THEN 'medium'
+        ELSE 'small' END 
+    
+       AS geosize_group               #alias resulting field of CASE WHEN
+
+FROM countries;
+
+
+--- Inner challenge
+--(1)
+SELECT name, continent, code, surface_area,
+    CASE WHEN surface_area > 2000000
+            THEN 'large'
+       WHEN surface_area > 350000
+            THEN 'medium'
+       ELSE 'small' END
+       AS geosize_group # rename values created from CASE WHEN THEN into 'geosize_group'
+INTO countries_plus # Create a table: countries_plus that content was created from ablove syntax
+FROM countries;
+
+--(2)
+----Require:From populations table, year 2015, create a field/table: popsize_group to organize population size into 3 group: 
+----'large' (> 50M),'medium' (> 1M), and 'small' groups.
+
+SELECT country_code, size,
+  -- start CASE here with WHEN and THEN
+    CASE WHEN size > 50000000
+        THEN 'large'
+  -- layout other CASE conditions here
+    WHEN size > 1000000
+        THEN 'medium'
+  -- end CASE here with ELSE & END
+    ELSE 'small' END
+  -- provide the alias of popsize_group to SELECT the new field
+    AS popsize_group
+-- which table?
+FROM populations AS p
+-- any conditions to check?
+WHERE year = 2015;
+
+---
+
+SELECT country_code, size,
+    CASE WHEN size > 50000000
+        THEN 'large'
+        WHEN size > 1000000
+        THEN 'medium'
+        ELSE 'small' END
+  
+    AS popsize_group -- provide the alias of popsize_group to SELECT the new field
+
+INTO pop_plus -- save the result of the previous query in another table: pop_plus
+FROM populations AS p
+-- any conditions to check?
+WHERE year = 2015; --;end the WHERE clause with ;
+
+SELECT *
+FROM pop_plus; --display table: pop_plus in the query result
+
+---
+
+SELECT country_code, size,
+  -- start CASE here with WHEN and THEN
+    CASE WHEN size > 50000000
+        THEN 'large'
+  -- layout other CASE conditions here
+    WHEN size > 1000000
+        THEN 'medium'
+  -- end CASE here with ELSE & END
+    ELSE 'small' END
+  -- provide the alias of popsize_group to SELECT the new field
+    AS popsize_group
+-- which table?
+INTO pop_plus
+FROM populations AS 
+-- any conditions to check?
+WHERE year = 2015;
+
+SELECT c.name, c.continent, c.geosize_group, p.popsize_group
+FROM countries_plus AS c
+INNER JOIN pop_plus AS p -- Join countries_plus to pop_plus
+ON c.code = p.country_code --Match on country code
+ORDER BY geosize_group; --Sort based:geosize_group, ascending=< large appears:top
+
+--- CHAPTER 2 - Outer joins and cross joins
+--Inner Join
+--(1)
+/*
+Select country name AS country, the country's local name,
+the language name AS language, and
+the percent of the language spoken in the country
+*/
+SELECT c1.name AS country, c1.local_name, l.name AS language, l.percent
+FROM countries AS c1
+  INNER JOIN languages AS l
+    ON c1.code = l.code
+ORDER BY country DESC;
+
+--(2)
+/*
+Select country name AS country, the country's local name,
+the language name AS language, and
+the percent of the language spoken in the country
+*/
+SELECT c.name AS country, c.local_name, l.name AS language, l.percent
+FROM countries as c
+  LEFT JOIN languages AS l --Left join
+    ON c.code = l.code
+ORDER BY country DESC;
+
+
+--- Left Join
+
+-- get the city name (and alias it), the country code,
+-- the country name (and alias it), the region,
+-- and the city proper population
+SELECT c1.name AS city, code, c2.name AS country,
+       region, city_proper_pop
+
+FROM cities AS c1
+
+LEFT JOIN countries AS c2
+-- how should the tables be matched?
+ON c1.country_code = c2.code
+-- sort based on code, descending order
+ORDER BY code DESC;
+
+--- Left join (2)
+
+/*
+select country name AS country, the country's local name,
+the language name AS language, and
+the percent of the language spoken in the country
+*/
+SELECT c.name AS country, local_name, l.name AS language, percent
+-- countries on the left (alias as c)
+FROM countries AS c
+-- inner join with languages (as l) on the right
+LEFT JOIN languages AS l
+-- give fields to match on
+ON c.code = l.code
+-- sort by descending country name
+ORDER BY country DESC;
+
+--- Left join (3)
+
+-- select name, region, and gdp_percapita
+SELECT name, region, gdp_percapita
+-- countries (alias c) on the left
+FROM countries AS c
+-- join with economies (alias e)
+LEFT JOIN economies AS e
+-- match on code fields
+ON c.code = e.code
+-- focus on 2010 entries
+WHERE e.year = 2010;
+
+---
+
+--average GDP per capita AS avg_gdp for each region in 2010.
+--> select: calculate AvG()
+--> FROM.. WHERE year= 2010;
+
+SELECT region, AVG(gdp_percapita) AS avg_gdp
+       
+FROM countries as c
+  LEFT JOIN economies as e
+  ON c.code = e.code
+
+WHERE e.year = 2010
+GROUP BY region;
+
+---
+
+-- select name, region, and gdp_percapita
+SELECT region, AVG(gdp_percapita) AS avg_gdp
+-- countries (alias c) on the left
+FROM countries AS c
+-- join with economies (alias e)
+LEFT JOIN economies AS e
+-- match on code fields
+ON c.code = e.code
+-- focus on 2010 entries
+WHERE e.year = 2010
+GROUP BY region
+ORDER BY avg_gdp DESC;
+
+--- Right join
+
+-- convert this code to use RIGHT JOINs instead of LEFT JOINs
+/*
+SELECT cities.name AS city, urbanarea_pop, countries.name AS country,
+       indep_year, languages.name AS language, percent
+FROM cities
+LEFT JOIN countries
+ON cities.country_code = countries.code
+LEFT JOIN languages
+ON countries.code = languages.code
+ORDER BY city, language;
+*/
+
+SELECT cities.name AS city, urbanarea_pop, countries.name AS country,
+       indep_year, languages.name AS language, percent
+FROM languages
+RIGHT JOIN countries
+ON languages.code = countries.code
+RIGHT JOIN cities
+ON countries.code = cities.country_code
+ORDER BY city, language;
+
+--- Full join
+
+SELECT name AS country, code, region, basic_unit
+FROM countries
+    FULL JOIN currencies
+        USING (code)
+WHERE region = 'North America' OR region IS NULL
+ORDER BY region;
+-- The same result as above, instead of FULL JOIN, use LEFT JOIN
+SELECT name AS country, code, region, basic_unit
+-- From countries
+FROM countries
+  -- Join to currencies
+  LEFT JOIN currencies
+    -- Match on code
+    USING(code)
+-- Where region is North America or null
+WHERE region = 'North America' OR region IS NULL
+-- Order by region
+ORDER BY region;
+
+--> FULL JOIN query returned 18 rows
+--the OUTER JOIN returned 4 rows
+--INNER JOIN only returned 3 rows
+---
+--#Require: show name of language, name of language, code
+--# that countries.name starts with V or is null*/
+SELECT countries.name, code, languages.name AS language #Alias languages.name as language ebcause 2 names in 2 tables
+FROM languages
+    FULL JOIN countries
+    USING (CODE)
+WHERE countries.name LIKE 'V%' OR countries.name IS NULL
+ORDER BY countries.name;
+
+---
+
+-- JOIN 3 tables
+--#Require: SHow what country speaks what lanague and which region names contain's  Melanesia and Microne
+--> Analysis: Select: name of country, name of languages, region that contains the Melanesia and Micronesia regions 
+---
+
+SELECT c1.name AS country, region, l.name AS language, basic_unit, frac_unit
+FROM countries as c1
+  FULL JOIN languages as l --join table:countries and table: languages
+    USING (code)
+  FULL JOIN currencies as c2 --join (the result of above join )and table: currencies
+    USING (code)
+  WHERE region LIKE 'M%esia';
+
+--- Cross join
+
+SELECT c.name AS city, l.name AS language
+FROM cities AS c
+    CROSS JOIN languages AS l
+WHERE c.name LIKE 'Hyder%';
+
+--- 
+
+SELECT c.name AS city, l.name AS language
+FROM cities AS c
+INNER JOIN languages AS l
+ON c.country_code = l.code
+WHERE c.name LIKE 'Hyder%';
+
+---
+--#  show :names of the lowest 5 countries and their regions of life expectancy for 2010
+--> Step analysis: select: name of table countries, regions of table c, life_expectancy of population. 5-> limit 5, 2010-> where year=, order by: region or life_exp??
+
+Select c.name as country, c.region, p.life_expectancy as life_exp
+From countries as c
+
+LEFT JOIN populations as p 
+ON c.code = p.country_code
+where year = 2010
+ORDER BY life_exp
+LIMIT 5;
+
+
+--- Chap 3;Set theory clauses
+
+--- Union
+
+-- pick specified columns from 2010 table
+SELECT *
+-- 2010 table will be on top
+FROM economies2010
+UNION
+SELECT *
+-- 2015 table on the bottom
+FROM economies2015
+-- order accordingly
+ORDER BY code, year;
+
+--- 
+
+SELECT country_code
+FROM cities
+UNION
+SELECT code
+FROM currencies
+ORDER BY country_code;
+
+--- Union all
+
+--Notice: UNION: no inclde dublicates
+----------UNION ALL: include dublicates
+--The result of the query should only have two columns/fields.--
+SELECT code, year 
+FROM economies 
+
+UNION ALL
+
+SELECT country_code, year
+FROM populations 
+
+ORDER BY code, year;
+
+--- Intersect
+
+SELECT code, year
+FROM economies
+INTERSECT
+SELECT country_code, year
+FROM populations
+ORDER BY code, year;
+
+---
+
+ --Require: Write SQL to answer this question: which countries also have a city with the same name as their country name?
+  -- Analysis: Table countries: name, capital; table cities: name
+  --> find column: name of 2 table and if these column are shown ( bysusing intersect)--> done
+
+  Select name, country_code
+  From cities
+
+  intersect
+  Select name, code
+  From countries
+  ORDER BY country_code;
+
+
+--- Except
+
+--Require:  Get the names of 'cities' in cities which are NOT noted as 'capital cities' in 'countries' as a single field result.
+
+SELECT name
+From cities
+
+EXCEPT
+SELECT capital
+FROM countries
+ORDER BY name;
+
+---
+
+--Require:Determine the names of capital cities that are not listed in the cities table.
+Select capital 
+From countries
+
+EXCEPT
+Select name
+From cities
+
+ORDER BY capital;
+
+--- Semi-join
+--Require: identify languages spoken in the Middle East.
+
+#STEP 1:
+Select countries.code
+From countries
+Where countries.region = 'Middle East';
+
+---
+
+SELECT DISTINCT lang.name
+FROM languages AS lang
+ORDER BY lang.name;
+
+---
+-- show only unique languages by name appearing in the languages table.
+--Analysis: only appear...1 table=> Use anti-join
+
+
+SELECT DISTINCT name
+FROM languages 
+WHERE code IN (SELECT code
+              FROM countries
+              WHERE region = 'Middle East')
+Order BY name;
+
+---
+--Require: select only unique languages by name appearing in the languages table.
+-- Analysis: use DISTINCT
+
+SELECT DISTINCT name
+    FROM languages
+ORDER BY name;
+
+--- Or similiar
+
+SELECT languages.name AS language
+FROM languages
+INNER JOIN countries
+ON languages.code = countries.code
+WHERE region = 'Middle East'
+ORDER BY language;
+
+--- Anti-join 
+--Require: the number of countries in countries that are listed in Oceania 
+SELECT COUNT(*)
+FROM countries
+WHERE continent = 'Oceania';
+
+---
+
+SELECT c1.code, c1.name, c2.basic_unit AS currency
+FROM countries AS c1
+INNER JOIN currencies AS c2
+USING (code)
+WHERE continent = 'Oceania';
+
+---
+
+SELECT c1.code, c1.name
+FROM countries AS c1
+WHERE c1.continent = 'Oceania'
+    AND code NOT IN
+    (SELECT code 
+    FROM currencies);
+	 
+---
+
+-- select the city name
+SELECT name
+-- alias the table where city name resides
+FROM cities AS c1
+-- choose only records matching the result of multiple set theory clauses
+WHERE country_code IN
+(
+    -- select appropriate field from economies AS e
+    SELECT e.code
+    FROM economies AS e
+    -- get all additional (unique) values of the field from currencies AS c2  
+    UNION
+    SELECT c2.code
+    FROM currencies AS c2
+    -- exclude those appearing in populations AS p
+    EXCEPT
+    SELECT p.country_code
+    FROM populations AS p
+);
+
+--
+-- Require:  identify languages spoken in the Middle East.
+
+SELECT DISTINCT name --select the unique name of language in table: languages
+FROM languages 
+WHERE code IN (SELECT code --these names whose code that has region ( from table countries to be 'Middile East')
+              FROM countries
+              WHERE region = 'Middle East')
+Order BY name;
+--
+
+--- CHAPTER 4 - Subqueries
+
+--- Subquery inside where
+
+SELECT AVG(life_expectancy)
+FROM populations
+WHERE year = 2015;
+
+--- 
+-- --REquire: show fields in Population that is larger than 1.15 times the average of life_expectation in 2015
+SELECT *
+FROM populations
+WHERE life_expectancy > 1.15 *
+    (SELECT AVG(life_expectancy)
+    FROM populations
+    WHERE year = 2015)
+    AND year = 2015;
+	
+---
+
+-- select the appropriate fields
+SELECT city.name, city.country_code, city.urbanarea_pop
+-- from the cities table
+FROM cities AS city
+-- with city name in the field of capital cities
+WHERE city.name IN
+  (SELECT capital
+   FROM countries)
+ORDER BY urbanarea_pop DESC;
+
+--- Subquery inside select
+--Require:get the urban area population for only capital cities.
+
+SELECT countries.name AS country, COUNT(*) AS cities_num
+FROM cities
+INNER JOIN countries
+ON countries.code = cities.country_code
+GROUP BY country
+ORDER BY cities_num DESC, country
+LIMIT 9;
+
+--- Same as
+
+SELECT countries.name AS country,
+  (SELECT COUNT(*)
+   FROM cities
+   WHERE countries.code = cities.country_code) AS cities_num
+FROM countries
+ORDER BY cities_num DESC, country
+LIMIT 9;
+
+--- Subquery inside from
+
+SELECT code, COUNT(name) AS lang_num
+FROM languages
+GROUP BY code;
+
+---
+-- number of languages spoken for each country, identified by the country's local name! 
+--Step 1:  how many languages in each country
+SELECT code,count(*) as lang_num
+FROM languages
+GROUP BY code;
+
+----
+-- Show number of languages for each countries
+SELECT local_name, subquery.lang_num
+FROM countries, 
+    (SELECT code, COUNT(name) AS lang_num
+    FROM languages
+    GROUP BY code) as subquery
+WHERE countries.code = subquery.code
+ORDER BY lang_num DESC;
+
+--- Advanced subquery
+----Require: for each of the six continents in 2015,
+-----------which country had the maximum inflation rate,how it was
+--> Analysis: Show inlation rate in 2015( as subquery first)-> then, show max( this inflation)
+-------------> Max(inflation_rate): SELECT, subquery of inflation_rate: FROM 
+----Step 1: show inflation rate in 6 continents in 2015 ( with name of country first)
+SELECT name, continent, inflation_rate
+FROM countries 
+INNER JOIN economies
+USING (code)
+WHERE year = 2015;
+
+---Step 2: show the maximum the above inflation rate( include year 2015 in subquery)
+
+SELECT MAX(inflation_rate) AS max_inf
+  FROM (
+      SELECT name, continent, inflation_rate
+      FROM countries
+      INNER JOIN economies
+      USING (code)
+      WHERE year = 2015) AS subquery
+GROUP BY continent;
+
+---
+--each of the six maximum inflation rate values occur only once in the 2015
+SELECT name, continent, inflation_rate
+FROM countries
+INNER JOIN economies
+USING(code)
+WHERE year = 2015
+    AND inflation_rate IN ( --to obtain the name of the country, its continent, and the maximum inflation rate for each continent in 2015.
+        SELECT MAX(inflation_rate) AS max_inf
+        FROM (
+             SELECT name, continent, inflation_rate
+             FROM countries
+             INNER JOIN economies
+             ON countries.code = economies.code
+             WHERE year = 2015) AS subquery
+        GROUP BY continent);
+		
+---
+----Require: get 2015 inflation rate,nemployment rate  for countries that do not have
+--gov_form of 'Constitutional Monarchy' or 'Republic' in their gov_form,
+--not use table aliasing in this exercise.
+---Analysis: inflation_rate,unemployment_rate (in table:economies)
+
+SELECT code, inflation_rate, unemployment_rate
+FROM economies
+WHERE year = 2015 AND code NOT IN
+  (SELECT code
+   FROM countries
+   WHERE (gov_form = 'Constitutional Monarchy' OR gov_form LIKE '%Republic'))
+ORDER BY inflation_rate;
+
+--- Final challenges
+--Show country names with total investment and imports in 2015 and they are
+--Central American countries with an official language
+
+--Analysis: 'Central America': region ( table: countries), 'official': (table: languages), 2015: year (table: economies)
+--- 3 tables-Z join 2 tables, the other table will be inside something include conditions with above 3 key words
+--code: appear 2 tables: countries, economies=> JOIN ( INner JOIn/ LEF JOIn...O... AND...IN( a subquerry included))
+--subquery: table left: languages=> include 'Official' with WHEN?
+-- OUt fo subquery: Include ' 2015', 'Central America'with WHEN?
+
+SELECT DISTINCT c.name, e.total_investment, e.imports
+FROM countries AS c
+LEFT JOIN economies AS e
+ON (c.code = e.code AND c.code IN 
+    (SELECT code 
+    FROM languages
+    WHERE official = 'true'))
+WHERE year = 2015 AND region = 'Central America'
+ORDER BY c.name;
+
+--
+--average fertility rate for each region in 2015.
+--Analysis: fertility_rate: population, regions: countries, 2015:year: population/economics
+
+SELECT c1.region, c1.continent, AVG(fertility_rate) AS avg_fert_rate
+FROM countries as c1
+INNER JOIN populations as p 
+ON c1.code = p.country_code
+  
+WHERE p.year = 2015
+GROUP BY c1.region, c1.continent --GROUP BY:fields that aren't included in the aggregate function of SELECT
+ORDER BY avg_fert_rate;
+
+--> INSIGHT: average fertility rate is lowest in Southern Europe 
+---> highest in Central Africa.
+
+---
+
+SELECT name, country_code, city_proper_pop, metroarea_pop,  
+      city_proper_pop / metroarea_pop * 100 AS city_perc
+FROM cities
+WHERE name IN
+  (SELECT capital
+   FROM countries
+   WHERE (continent = 'Europe'
+      OR continent LIKE '%America'))
+     AND metroarea_pop IS NOT NULL
+ORDER BY city_perc DESC
+LIMIT 10;
+
+
